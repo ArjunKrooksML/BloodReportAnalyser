@@ -1,0 +1,7 @@
+*.env
+venv/
+*.claude
+uploads/
+__pycache__/
+data.db
+*.db
