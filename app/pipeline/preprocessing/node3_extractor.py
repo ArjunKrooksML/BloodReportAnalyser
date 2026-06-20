@@ -8,7 +8,7 @@ from app.utils.json_utils import parse_llm_json
 
 log = logging.getLogger(__name__)
 
-llm = ChatOpenAI(model="gpt-4o-mini", max_tokens=1024)
+llm = ChatOpenAI(model="gpt-4o-mini", max_tokens=4096)
 
 EXTRACT_PROMPT = """Extract all test markers for the "{panel}" panel from the following lab report text.
 

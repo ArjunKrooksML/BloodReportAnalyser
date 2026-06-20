@@ -9,14 +9,30 @@ log = logging.getLogger(__name__)
 
 llm = ChatOpenAI(model="gpt-4o-mini", max_tokens=512)
 
-CRITIC_PROMPT = """You are reviewing extracted markers from a medical lab report.
-Check ONLY for these structural issues — do NOT flag clinically abnormal values as errors:
-- Missing units on any marker
-- Values that are physically impossible (e.g. hemoglobin of 500 g/dL, glucose of 5000 mg/dL)
-- Markers where the value is clearly an OCR error (e.g. letters mixed into a number like "2a8")
-- Obvious OCR errors in marker names (e.g. "Glucos3" instead of "Glucose")
+CRITIC_PROMPT = """You are a data quality checker for extracted lab markers. Your job is extremely narrow.
 
-Do NOT flag a value just because it is outside the reference range — abnormal lab results are valid data.
+FLAG only these two things:
+1. The value field contains non-numeric garbage that cannot be a real measurement (e.g. "2a8", "N/A", "---", "..")
+2. The value is so extreme it is biologically impossible for a human to be alive (e.g. Hemoglobin 850 g/dL, Glucose 9000 mg/dL, WBC 0.000001 K/μL)
+
+NEVER flag any of these — they are all valid:
+- A value that is higher than reference_high or lower than reference_low → this is just an abnormal result, not an error
+- A value slightly above or below the reference range by any amount → valid clinical data
+- A ratio or index marker (e.g. LDL/HDL Ratio, Cholesterol/HDL) with no unit → ratios are dimensionless
+- reference_low or reference_high being null → one-sided ranges are normal (eGFR, ESR, etc.)
+- Capitalisation or abbreviation differences in marker names (HbA1c vs HbA1C, eGFR vs EGFR) → not OCR errors
+- Any marker name that looks like a real medical test, even if uncommon
+
+Examples that PASS (return passed: true):
+- RDW CV: 14.4%  ref 11.0–14.0%  ← slightly above range, valid
+- ESR: 46 mm/h  ref high 10 mm/h  ← very elevated but biologically possible
+- Phosphorus: 5.3 mg/dL  ref high 4.5  ← valid elevated phosphorus
+- Cholesterol/HDL Ratio: 4.2  unit: null  ← dimensionless ratio, correct
+- HbA1C: 7.2%  ← capitalisation variant, fine
+
+Examples that FAIL (return passed: false):
+- Hemoglobin: 850 g/dL  ← no living human has this
+- Glucose: "2a8 mg/dL"  ← OCR garbage, not a parseable number
 
 Respond with JSON only:
 {{
